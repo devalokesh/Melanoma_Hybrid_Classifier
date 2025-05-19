@@ -1,0 +1,44 @@
+import numpy as np
+import cv2
+from PIL import Image
+from tkinter import filedialog, Tk
+from preprocess import load_and_preprocess_image
+from tensorflow.keras.models import load_model
+
+# Load trained model
+model = load_model("hybrid_tumor_model.h5")
+
+# Select image
+Tk().withdraw()
+img_path = filedialog.askopenfilename(
+    title="Select a tumor image",
+    filetypes=[("Image files", "*.jpg *.jpeg *.png")]
+)
+
+if not img_path:
+    print("❌ No image selected.")
+    exit()
+
+# Preprocess for model
+img_rgb, edge_img, hist_vec = load_and_preprocess_image(img_path)
+img_rgb_model = np.expand_dims(img_rgb, axis=0)
+edge_img_model = np.expand_dims(edge_img, axis=0)
+hist_vec_model = np.expand_dims(hist_vec, axis=0)
+
+# Predict
+prediction = model.predict([img_rgb_model, edge_img_model, hist_vec_model])
+label = "Malignant" if np.argmax(prediction) == 1 else "Benign"
+confidence = float(np.max(prediction)) * 100
+
+# Show result using OpenCV
+img_cv = cv2.imread(img_path)
+img_cv = cv2.resize(img_cv, (400, 400))
+
+# Add text to the image
+display_text = f"Prediction: {label} ({confidence:.2f}%)"
+cv2.putText(img_cv, display_text, (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0) if label == "Benign" else (0, 0, 255), 2)
+
+cv2.imshow("Tumor Classification", img_cv)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
